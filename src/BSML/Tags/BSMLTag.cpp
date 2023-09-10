@@ -2,7 +2,6 @@
 #include "BSML/TypeHandlers/TypeHandler.hpp"
 #include "BSML/Components/ExternalComponents.hpp"
 
-#include "internal_macros.hpp"
 #include "logging.hpp"
 
 #include "UnityEngine/GameObject.hpp"
@@ -54,23 +53,27 @@ namespace BSML {
             componentTypeWithData->typeHandler->HandleType(*componentTypeWithData, parserParams);
         }
 
-        // set the host field if we can
-        auto fieldInfo = il2cpp_functions::class_get_field_from_name(parserParams.host->klass, id.c_str());
-        if (fieldInfo) {
-            auto fieldSystemType = il2cpp_utils::GetSystemType(il2cpp_functions::field_get_type(fieldInfo));
-            static auto gameObjectSystemType = csTypeOf(UnityEngine::GameObject*);
-            if (gameObjectSystemType == fieldSystemType) {
-                // if the field is of type GameObject, set the field to the current object value
-                SetHostField(parserParams.host, currentObject);
-            } else { 
-                // if the field is not a GameObject, try to find the type of the field with the GetExternalComponent method, and set that on the field
-                auto component = GetExternalComponent(currentObject, externalComponents, fieldSystemType);
-                if (component) {
-                    SetHostField(parserParams.host, component);
+        // check host for null & check id even given at all
+        auto host = parserParams.host;
+        if (host && !id.empty()) {
+            // set the host field if we can
+            auto fieldInfo = il2cpp_functions::class_get_field_from_name(parserParams.host->klass, id.c_str());
+            if (fieldInfo) {
+                auto fieldSystemType = il2cpp_utils::GetSystemType(il2cpp_functions::field_get_type(fieldInfo));
+                static auto gameObjectSystemType = csTypeOf(UnityEngine::GameObject*);
+                if (gameObjectSystemType == fieldSystemType) {
+                    // if the field is of type GameObject, set the field to the current object value
+                    SetHostField(parserParams.host, currentObject);
+                } else { 
+                    // if the field is not a GameObject, try to find the type of the field with the GetExternalComponent method, and set that on the field
+                    auto component = GetExternalComponent(currentObject, externalComponents, fieldSystemType);
+                    if (component) {
+                        SetHostField(parserParams.host, component);
+                    }
                 }
             }
         }
-        
+
         // add object to tags on parserParams
         if (!tags.empty()) {
             parserParams.AddObjectWithTags(currentObject, tags);
@@ -102,6 +105,13 @@ namespace BSML {
             if (il2cpp_utils::IsConvertibleFrom(fieldInfo->type, &value->klass->byval_arg))
                 il2cpp_functions::field_set_value(host, fieldInfo, value);
         }
+    }
+
+    #define GET_BSML_STRING(identifier, store)                      \
+    {                                                               \
+        const char* temp_##store = nullptr;                         \
+        if (!elem.QueryStringAttribute(identifier, &temp_##store))  \
+            store = std::string_view(temp_##store);                 \
     }
 
     void BSMLTag::parse(const tinyxml2::XMLElement& elem) {
